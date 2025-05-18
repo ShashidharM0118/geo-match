@@ -1,103 +1,278 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import MapComponent from '@/components/MapComponent';
+import { findNearestDrivers, cancelDriver, getDefaultUserLocation, Driver, addDriver } from '@/lib/driverUtils';
+import { toast } from 'sonner';
+import dynamic from 'next/dynamic';
+
+// Dynamically import MapComponent to avoid SSR issues with Leaflet
+const DynamicMapComponent = dynamic(() => import('@/components/MapComponent'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[600px] w-full flex items-center justify-center bg-gray-100 rounded-lg">
+      <p>Loading Map...</p>
+    </div>
+  ),
+});
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [activeTab, setActiveTab] = useState('visualization');
+  const [userLocation, setUserLocation] = useState(getDefaultUserLocation());
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [nearestDrivers, setNearestDrivers] = useState<Driver[]>([]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Use localStorage to persist driver data between tabs
+  useEffect(() => {
+    // Try to get data from localStorage
+    const storedDrivers = localStorage.getItem('drivers');
+    const storedNearestDrivers = localStorage.getItem('nearestDrivers');
+    
+    if (storedDrivers) {
+      setDrivers(JSON.parse(storedDrivers));
+    }
+    
+    if (storedNearestDrivers) {
+      setNearestDrivers(JSON.parse(storedNearestDrivers));
+    } else {
+      // Initialize nearest drivers if not in localStorage
+      const nearest = findNearestDrivers(userLocation.lat, userLocation.lng, drivers, 5);
+      setNearestDrivers(nearest);
+      localStorage.setItem('nearestDrivers', JSON.stringify(nearest));
+    }
+  }, []);
+
+  // Update localStorage when drivers or nearest drivers change
+  useEffect(() => {
+    localStorage.setItem('drivers', JSON.stringify(drivers));
+    localStorage.setItem('nearestDrivers', JSON.stringify(nearestDrivers));
+  }, [drivers, nearestDrivers]);
+
+  // Function to handle driver cancellation
+  const handleCancelDriver = (driverId: number) => {
+    // Update drivers list
+    const updatedDrivers = cancelDriver(driverId, drivers);
+    setDrivers(updatedDrivers);
+    
+    // Get the new nearest drivers
+    const nearest = findNearestDrivers(userLocation.lat, userLocation.lng, updatedDrivers, 5);
+    setNearestDrivers(nearest);
+    
+    toast.success(`Driver #${driverId} has been canceled`, {
+      description: 'Refreshing with the next 5 nearest drivers',
+    });
+  };
+
+  // Function to handle adding a new driver from the map
+  const handleAddDriver = (lat: number, lng: number) => {
+    const updatedDrivers = addDriver(lat, lng, drivers);
+    setDrivers(updatedDrivers);
+    
+    // Get the new nearest drivers
+    const nearest = findNearestDrivers(userLocation.lat, userLocation.lng, updatedDrivers, 5);
+    setNearestDrivers(nearest);
+    
+    toast.success('New driver added', {
+      description: `Driver added at location [${lat.toFixed(6)}, ${lng.toFixed(6)}]`,
+    });
+  };
+
+  // Function to get user's current location
+  const handleGetCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setUserLocation(newLocation);
+          
+          // Update nearest drivers based on new location
+          const nearest = findNearestDrivers(newLocation.lat, newLocation.lng, drivers, 5);
+          setNearestDrivers(nearest);
+          
+          toast.success('Location updated', {
+            description: 'Using your current location',
+          });
+        },
+        () => {
+          toast.error('Unable to retrieve your location', {
+            description: 'Using default location instead',
+          });
+        }
+      );
+    } else {
+      toast.error('Geolocation is not supported by this browser', {
+        description: 'Using default location instead',
+      });
+    }
+  };
+
+  // Clear all drivers
+  const handleClearDrivers = () => {
+    setDrivers([]);
+    setNearestDrivers([]);
+    
+    toast.success('All drivers cleared', {
+      description: 'The map has been reset',
+    });
+    
+    // Also clear localStorage
+    localStorage.removeItem('drivers');
+    localStorage.removeItem('nearestDrivers');
+  };
+
+  return (
+    <main className="min-h-screen bg-gradient-to-b from-blue-50 to-indigo-100 p-4 md:p-8">
+      <div className="container mx-auto space-y-8">
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-bold text-indigo-700">Uber H3 Driver Finder</h1>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Visualize the top 5 nearest drivers using Uber H3 algorithm implementation in C++
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        
+        <div className="flex justify-center gap-4 my-6">
+          <Button onClick={handleGetCurrentLocation}>
+            Use My Current Location
+          </Button>
+          <Button variant="destructive" onClick={handleClearDrivers}>
+            Clear All Drivers
+          </Button>
+        </div>
+        
+        <Tabs 
+          defaultValue="visualization" 
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <TabsList className="grid w-full grid-cols-2 mb-8">
+            <TabsTrigger value="visualization">Driver Visualization</TabsTrigger>
+            <TabsTrigger value="management">Driver Management</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="visualization" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Top 5 Nearest Drivers</CardTitle>
+                <CardDescription>
+                  Visualizing nearest drivers from your current location using Uber H3
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DynamicMapComponent 
+                  userLocation={userLocation}
+                  drivers={nearestDrivers}
+                />
+                {nearestDrivers.length === 0 && (
+                  <div className="text-center p-4 mt-4 bg-gray-100 rounded-md">
+                    <p className="text-gray-500">No drivers available. Add drivers in the Management tab.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Nearest Drivers List</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {nearestDrivers.length > 0 ? (
+                  <div className="space-y-4">
+                    {nearestDrivers.map((driver) => (
+                      <div 
+                        key={driver.id} 
+                        className="p-4 border rounded-lg flex justify-between items-center bg-white"
+                      >
+                        <div>
+                          <p className="font-medium">{driver.name}</p>
+                          <p className="text-sm text-gray-500">
+                            ID: {driver.id} • Location: {driver.lat.toFixed(4)}, {driver.lng.toFixed(4)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center p-4 bg-gray-100 rounded-md">
+                    <p className="text-gray-500">No drivers available. Add drivers in the Management tab.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="management" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Driver Management</CardTitle>
+                <CardDescription>
+                  Manage drivers - click on the map to add a new driver, or cancel existing ones
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DynamicMapComponent 
+                  userLocation={userLocation}
+                  drivers={drivers}
+                  onDriverCancel={handleCancelDriver}
+                  onAddDriver={handleAddDriver}
+                  isManagementMode={true}
+                />
+                {drivers.length === 0 && (
+                  <div className="text-center p-4 mt-4 bg-blue-50 rounded-md">
+                    <p className="text-blue-700">Click anywhere on the map to add your first driver!</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>All Drivers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {drivers.length > 0 ? (
+                  <div className="space-y-4">
+                    {drivers.map((driver) => (
+                      <div 
+                        key={driver.id} 
+                        className="p-4 border rounded-lg flex justify-between items-center bg-white"
+                      >
+                        <div>
+                          <p className="font-medium">{driver.name}</p>
+                          <p className="text-sm text-gray-500">
+                            ID: {driver.id} • Location: {driver.lat.toFixed(6)}, {driver.lng.toFixed(6)}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            Status: {driver.available ? 'Available' : 'Canceled'}
+                          </p>
+                        </div>
+                        {driver.available && (
+                          <Button 
+                            variant="destructive" 
+                            onClick={() => handleCancelDriver(driver.id)}
+                          >
+                            Cancel Driver
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center p-4 bg-gray-100 rounded-md">
+                    <p className="text-gray-500">No drivers added yet. Click on the map to add drivers.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </main>
   );
-}
+} 
