@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import MapComponent from '@/components/MapComponent';
 import { findNearestDrivers, cancelDriver, getDefaultUserLocation, Driver, addDriver } from '@/lib/driverUtils';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
@@ -43,6 +42,7 @@ export default function Home() {
       setNearestDrivers(nearest);
       localStorage.setItem('nearestDrivers', JSON.stringify(nearest));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update localStorage when drivers or nearest drivers change

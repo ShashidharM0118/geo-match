@@ -36,34 +36,59 @@ export function findNearestDrivers(
     return [];
   }
 
-  // Get the H3 index for the user location at resolution 9
-  const userH3Index = h3.latLngToCell(userLat, userLng, 9);
-  
-  // Calculate distances and use H3 for optimization
-  const distances = drivers
-    .filter(driver => driver.available)
-    .map(driver => {
-      // Get H3 index for driver
-      const driverH3Index = h3.latLngToCell(driver.lat, driver.lng, 9);
-      
-      // Calculate H3 grid distance
-      const gridDistance = h3.gridDistance(userH3Index, driverH3Index);
-      
-      // Use haversine for actual distance calculation
-      const distance = haversineDistance(userLat, userLng, driver.lat, driver.lng);
-      
-      return { driver, distance, gridDistance };
-    })
-    // Sort first by H3 grid distance, then by actual distance
-    .sort((a, b) => a.gridDistance - b.gridDistance || a.distance - b.distance)
-    .slice(0, n)
-    .map(item => item.driver);
+  try {
+    // Get the H3 index for the user location at resolution 9
+    const userH3Index = h3.latLngToCell(userLat, userLng, 9);
+    
+    // Calculate distances and use H3 for optimization
+    const distances = drivers
+      .filter(driver => driver.available)
+      .map(driver => {
+        try {
+          // Get H3 index for driver
+          const driverH3Index = h3.latLngToCell(driver.lat, driver.lng, 9);
+          
+          // Calculate H3 grid distance
+          const gridDistance = h3.gridDistance(userH3Index, driverH3Index);
+          
+          // Use haversine for actual distance calculation
+          const distance = haversineDistance(userLat, userLng, driver.lat, driver.lng);
+          
+          return { driver, distance, gridDistance };
+        } catch (err) {
+          // If H3 calculation fails for a driver, fall back to haversine distance only
+          const distance = haversineDistance(userLat, userLng, driver.lat, driver.lng);
+          return { driver, distance, gridDistance: Number.MAX_SAFE_INTEGER };
+        }
+      })
+      // Sort first by H3 grid distance, then by actual distance
+      .sort((a, b) => a.gridDistance - b.gridDistance || a.distance - b.distance)
+      .slice(0, n)
+      .map(item => item.driver);
 
-  return distances;
+    return distances;
+  } catch (error) {
+    console.error("Error in findNearestDrivers:", error);
+    
+    // Fallback to simple distance calculation
+    return drivers
+      .filter(driver => driver.available)
+      .map(driver => ({
+        driver,
+        distance: haversineDistance(userLat, userLng, driver.lat, driver.lng)
+      }))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, n)
+      .map(item => item.driver);
+  }
 }
 
 // Cancel a driver
 export function cancelDriver(driverId: number, drivers: Driver[]): Driver[] {
+  if (!drivers || drivers.length === 0) {
+    return [];
+  }
+  
   return drivers.map(driver => 
     driver.id === driverId 
       ? { ...driver, available: false } 
@@ -73,6 +98,10 @@ export function cancelDriver(driverId: number, drivers: Driver[]): Driver[] {
 
 // Check if a driver is available
 export function isDriverAvailable(driverId: number, drivers: Driver[]): boolean {
+  if (!drivers || drivers.length === 0) {
+    return false;
+  }
+  
   const driver = drivers.find(d => d.id === driverId);
   return driver ? driver.available : false;
 }
@@ -83,7 +112,11 @@ export function getDefaultUserLocation() {
 }
 
 // Add a new driver at the specified location
-export function addDriver(lat: number, lng: number, drivers: Driver[], name?: string): Driver[] {
+export function addDriver(lat: number, lng: number, drivers: Driver[] = [], name?: string): Driver[] {
+  if (!drivers) {
+    drivers = [];
+  }
+  
   // Generate a new unique ID
   const maxId = drivers.length > 0 ? Math.max(...drivers.map(d => d.id), 0) : 0;
   const newId = maxId + 1;

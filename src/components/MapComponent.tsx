@@ -1,10 +1,29 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Driver } from '@/lib/driverUtils';
+
+// Add custom CSS for map cursors
+const mapStyles = `
+  .leaflet-container {
+    cursor: default;
+  }
+  .management-mode .leaflet-container {
+    cursor: pointer !important;
+  }
+  .leaflet-marker-icon {
+    cursor: pointer !important;
+  }
+  .leaflet-popup-close-button {
+    cursor: pointer !important;
+  }
+  .custom-div-icon div {
+    cursor: pointer;
+  }
+`;
 
 // Component to update map center when props change
 function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
@@ -41,17 +60,17 @@ const MapComponent: React.FC<MapComponentProps> = ({
   isManagementMode = false,
 }) => {
   const center: [number, number] = [userLocation.lat, userLocation.lng];
-  const [mapType, setMapType] = useState<'default'>('default'); // Always use default map
   const zoom = 17; // Higher zoom level
 
   // Create simple icon divs for markers instead of images
-  const createSimpleIcon = (color: string, text: string, isUser = false) => {
+  const createSimpleIcon = (color: string, text: string) => {
     return L.divIcon({
       className: 'custom-div-icon',
       html: `<div style="background-color: ${color}; color: white; 
              width: 30px; height: 30px; border-radius: 50%; 
              display: flex; align-items: center; justify-content: center;
-             font-weight: bold; border: 2px solid white;">${text}</div>`,
+             font-weight: bold; border: 2px solid white;
+             cursor: pointer;">${text}</div>`,
       iconSize: [30, 30],
       iconAnchor: [15, 15],
       popupAnchor: [0, -15],
@@ -59,7 +78,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   };
 
   // User and driver icons
-  const userIcon = createSimpleIcon('#4a89dc', 'You', true);
+  const userIcon = createSimpleIcon('#4a89dc', 'You');
   
   // Handle map click to add a new driver
   const handleMapClick = useCallback((lat: number, lng: number) => {
@@ -67,6 +86,17 @@ const MapComponent: React.FC<MapComponentProps> = ({
       onAddDriver(lat, lng);
     }
   }, [isManagementMode, onAddDriver]);
+
+  // Add style tag for cursor styles
+  useEffect(() => {
+    const styleTag = document.createElement('style');
+    styleTag.innerHTML = mapStyles;
+    document.head.appendChild(styleTag);
+    
+    return () => {
+      document.head.removeChild(styleTag);
+    };
+  }, []);
   
   return (
     <div className="flex flex-col h-[600px] w-full">
@@ -77,7 +107,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
           </div>
         )}
       </div>
-      <div className="flex-grow rounded-lg overflow-hidden border border-gray-200">
+      <div className={`flex-grow rounded-lg overflow-hidden border border-gray-200 ${isManagementMode ? 'management-mode' : ''}`}>
         <MapContainer
           center={center}
           zoom={zoom}
@@ -134,7 +164,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
                     {onDriverCancel && driver.available && (
                       <button
                         onClick={() => onDriverCancel(driver.id)}
-                        className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                        className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600 transition-colors cursor-pointer"
                       >
                         Cancel Driver
                       </button>
