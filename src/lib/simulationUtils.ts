@@ -13,8 +13,16 @@ interface DriverMovement {
   speed: number;
 }
 
+// Extend Window interface to avoid using 'any'
+declare global {
+  interface Window {
+    __driverSimulationInterval: number | null;
+    __updateSimulationUserLocation: ((newLocation: { lat: number; lng: number }) => void) | null;
+  }
+}
+
 // Keep track of driver movements
-let driverMovements: Map<number, DriverMovement> = new Map();
+const driverMovements: Map<number, DriverMovement> = new Map();
 
 /**
  * Initialize movement data for a driver
@@ -71,7 +79,7 @@ export const startDriverSimulation = (
   let currentUserLocation = { ...userLocation };
   
   // Function to update user location reference
-  (window as any).__updateSimulationUserLocation = (newLocation: { lat: number; lng: number }) => {
+  window.__updateSimulationUserLocation = (newLocation: { lat: number; lng: number }) => {
     currentUserLocation = { ...newLocation };
   };
   
@@ -112,7 +120,7 @@ export const startDriverSimulation = (
   }, UPDATE_INTERVAL);
   
   // Store the interval ID in window for cleanup
-  (window as any).__driverSimulationInterval = intervalId;
+  window.__driverSimulationInterval = intervalId;
   
   return intervalId;
 };
@@ -121,8 +129,8 @@ export const startDriverSimulation = (
  * Update the user location for the ongoing simulation
  */
 export const updateSimulationUserLocation = (userLocation: { lat: number; lng: number }) => {
-  if (typeof window !== 'undefined' && (window as any).__updateSimulationUserLocation) {
-    (window as any).__updateSimulationUserLocation(userLocation);
+  if (typeof window !== 'undefined' && window.__updateSimulationUserLocation) {
+    window.__updateSimulationUserLocation(userLocation);
   }
 };
 
@@ -131,13 +139,13 @@ export const updateSimulationUserLocation = (userLocation: { lat: number; lng: n
  */
 export const stopDriverSimulation = () => {
   if (typeof window !== 'undefined') {
-    if ((window as any).__driverSimulationInterval) {
-      clearInterval((window as any).__driverSimulationInterval);
-      (window as any).__driverSimulationInterval = null;
+    if (window.__driverSimulationInterval) {
+      clearInterval(window.__driverSimulationInterval);
+      window.__driverSimulationInterval = null;
     }
     
     // Clear updater function
-    (window as any).__updateSimulationUserLocation = null;
+    window.__updateSimulationUserLocation = null;
   }
   
   // Clear movement data
