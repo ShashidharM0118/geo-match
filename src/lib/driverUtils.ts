@@ -55,7 +55,7 @@ export function findNearestDrivers(
           const distance = haversineDistance(userLat, userLng, driver.lat, driver.lng);
           
           return { driver, distance, gridDistance };
-        } catch (_error) {
+        } catch {
           // If H3 calculation fails for a driver, fall back to haversine distance only
           const distance = haversineDistance(userLat, userLng, driver.lat, driver.lng);
           return { driver, distance, gridDistance: Number.MAX_SAFE_INTEGER };
@@ -67,9 +67,7 @@ export function findNearestDrivers(
       .map(item => item.driver);
 
     return distances;
-  } catch (error) {
-    console.error("Error in findNearestDrivers:", error);
-    
+  } catch {
     // Fallback to simple distance calculation
     return drivers
       .filter(driver => driver.available)
