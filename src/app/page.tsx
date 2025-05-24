@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { findNearestDrivers, cancelDriver, getDefaultUserLocation, Driver, addDriver } from '@/lib/driverUtils';
-import { startDriverSimulation, stopDriverSimulation, updateSimulationUserLocation } from '@/lib/simulationUtils';
+import { findNearestDrivers, cancelDriver, getDefaultUserLocation, Driver, addDriver, updateAllDriversPositions } from '@/lib/driverUtils';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 
@@ -24,7 +23,6 @@ export default function Home() {
   const [userLocation, setUserLocation] = useState(getDefaultUserLocation());
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [nearestDrivers, setNearestDrivers] = useState<Driver[]>([]);
-  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
 
   // Use localStorage to persist driver data between tabs
   useEffect(() => {
@@ -97,11 +95,6 @@ export default function Home() {
           const nearest = findNearestDrivers(newLocation.lat, newLocation.lng, drivers, 5);
           setNearestDrivers(nearest);
           
-          // Update simulation with new user location if simulation is running
-          if (isSimulationRunning) {
-            updateSimulationUserLocation(newLocation);
-          }
-          
           toast.success('Location updated', {
             description: 'Using your current location',
           });
@@ -121,12 +114,6 @@ export default function Home() {
 
   // Clear all drivers
   const handleClearDrivers = () => {
-    // Stop simulation if running
-    if (isSimulationRunning) {
-      stopDriverSimulation();
-      setIsSimulationRunning(false);
-    }
-    
     setDrivers([]);
     setNearestDrivers([]);
     
@@ -138,73 +125,40 @@ export default function Home() {
     localStorage.removeItem('drivers');
     localStorage.removeItem('nearestDrivers');
   };
-  
-  // Toggle simulation
-  const toggleSimulation = () => {
-    if (isSimulationRunning) {
-      // Stop simulation
-      stopDriverSimulation();
-      toast.info('Simulation stopped', {
-        description: 'Driver locations are no longer being updated in real-time',
-      });
-    } else {
-      // Start simulation
-      if (drivers.length === 0) {
-        toast.error('No drivers to simulate', {
-          description: 'Add drivers in the Management tab first',
-        });
-        return;
-      }
-      
-      startDriverSimulation(setDrivers, setNearestDrivers, userLocation);
-      toast.success('Simulation started', {
-        description: 'Driver locations are now being updated in real-time',
-      });
-    }
+
+  const handleUpdateAllDrivers = () => {
+    const updatedDrivers = updateAllDriversPositions(drivers);
+    setDrivers(updatedDrivers);
     
-    setIsSimulationRunning(!isSimulationRunning);
+    const nearest = findNearestDrivers(userLocation.lat, userLocation.lng, updatedDrivers, 5);
+    setNearestDrivers(nearest);
+    
+    toast.success('All drivers updated', {
+      description: 'Driver positions have been randomly updated',
+    });
   };
-  
-  // Stop simulation on unmount
-  useEffect(() => {
-    return () => {
-      stopDriverSimulation();
-    };
-  }, []);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-indigo-100 p-4 md:p-8">
       <div className="container mx-auto space-y-8">
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-indigo-700">Uber H3 Driver Finder</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Visualize the top 5 nearest drivers using Uber H3 algorithm implementation in C++
-          </p>
+          <h1 className="text-4xl font-bold text-indigo-700">KD-Tree Driver Finder</h1>
+          {/*<p className="text-gray-600 max-w-2xl mx-auto">*/}
+          {/*  Visualize the top 5 nearest drivers using KD-tree algorithm implementation in C++*/}
+          {/*</p>*/}
         </div>
         
         <div className="flex justify-center gap-4 my-6">
           <Button onClick={handleGetCurrentLocation}>
             Use My Current Location
           </Button>
-          <Button 
-            onClick={toggleSimulation}
-            variant={isSimulationRunning ? "outline" : "default"}
-            className={isSimulationRunning ? "bg-amber-100 hover:bg-amber-200 text-amber-800" : "bg-green-600 hover:bg-green-700"}
-          >
-            {isSimulationRunning ? 'Stop Simulation' : 'Start Simulation'}
-          </Button>
           <Button variant="destructive" onClick={handleClearDrivers}>
             Clear All Drivers
           </Button>
+          <Button variant="secondary" onClick={handleUpdateAllDrivers}>
+            Update All Drivers
+          </Button>
         </div>
-        
-        {isSimulationRunning && (
-          <div className="bg-amber-50 border border-amber-200 p-3 rounded-md text-center animate-pulse">
-            <p className="text-amber-800">
-              Simulation running: Driver locations are being updated in real-time
-            </p>
-          </div>
-        )}
         
         <Tabs 
           defaultValue="visualization" 
@@ -222,7 +176,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>Top 5 Nearest Drivers</CardTitle>
                 <CardDescription>
-                  Visualizing nearest drivers from your current location using Uber H3
+                  Visualizing nearest drivers from your current location using KD-tree
                 </CardDescription>
               </CardHeader>
               <CardContent>

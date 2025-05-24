@@ -5,32 +5,12 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Tooltip }
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Driver } from '@/lib/driverUtils';
-
-// Add custom CSS for map cursors
-const mapStyles = `
-  .leaflet-container {
-    cursor: default;
-  }
-  .management-mode .leaflet-container {
-    cursor: pointer !important;
-  }
-  .leaflet-marker-icon {
-    cursor: pointer !important;
-  }
-  .leaflet-popup-close-button {
-    cursor: pointer !important;
-  }
-  .custom-div-icon div {
-    cursor: pointer;
-  }
-`;
+import { mapStyles } from '@/lib/mapStyles';
 
 // Component to update map center when props change
 function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
+  const map = useMapEvents({});
+  map.setView(center, zoom);
   return null;
 }
 

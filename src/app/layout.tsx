@@ -6,15 +6,15 @@ import { Toaster } from "@/components/ui/toast";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Uber H3 Driver Finder",
-  description: "Find nearby drivers using Uber H3 algorithm",
+  title: "KD-Tree Driver Finder",
+  description: "Find nearby drivers using KD-tree algorithm",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en">
       <body className={inter.className}>
